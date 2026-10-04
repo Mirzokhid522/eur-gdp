@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real GDP (volume), quarterly growth - Euro Area 21</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js DataLabels Plugin CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 30px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            border: 1px solid #2a2a2a;
+        }
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .title-group h2 {
+            margin: 0;
+            color: #ffffff;
+            font-size: 1.25rem;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+        .meta-strip {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #aaa;
+            background: #222;
+            padding: 8px 14px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #2e2e2e;
+        }
+        .meta-item span {
+            color: #fff;
+            font-weight: 500;
+        }
+        .timeframe-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .time-btn {
+            background-color: #2a2a2a;
+            color: #aaa;
+            border: 1px solid #3a3a3a;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .time-btn:hover {
+            background-color: #333;
+            color: #fff;
+        }
+        .time-btn.active {
+            background-color: #1c73cc;
+            color: #fff;
+            border-color: #1c73cc;
+        }
+        .error-banner {
+            background-color: #5c1d1d;
+            color: #ff8888;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #ff4444;
+        }
+        .chart-container {
+            position: relative;
+            height: 480px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-info">
+            <div class="title-group">
+                <h2>Real GDP (volume), quarterly growth, Euro area 21, Quarterly</h2>
+                <div class="subtitle">Dataset: namq_10_gdp | Seasonal & Calendar Adjusted</div>
+            </div>
+            <div class="timeframe-buttons">
+                <button class="time-btn" onclick="updateTimeframe(4, this)">1 year</button>
+                <button class="time-btn" onclick="updateTimeframe(12, this)">3 years</button>
+                <button class="time-btn" onclick="updateTimeframe(20, this)">5 years</button>
+                <button class="time-btn active" onclick="updateTimeframe('full', this)">Full range</button>
+            </div>
+        </div>
+
+        <div class="meta-strip">
+            <div class="meta-item">Last Updated: <span id="lastUpdated">September 7, 2026 (Q2 Final)</span></div>
+            <div class="meta-item">Next Release: <span id="nextRelease">October 30, 2026 (Q3 Flash)</span></div>
+        </div>
+
+        {% if error %}
+            <div class="error-banner">
+                <strong>API Error:</strong> {{ error }}
+            </div>
+        {% endif %}
+
+        <div class="chart-container">
+            <canvas id="eurostatChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const allLabels = JSON.parse('{{ labels | tojson | safe }}');
+        const allValues = JSON.parse('{{ values | tojson | safe }}');
+
+        const ctx = document.getElementById('eurostatChart').getContext('2d');
+        const eurostatChart = new Chart(ctx, {
+            type: 'bar', // Base type is bar, line dataset is mixed in
+            data: {
+                labels: allLabels,
+                datasets: [
+                    {
+                        type: 'line',
+                        label: 'Trend Line',
+                        data: allValues,
+                        borderColor: '#00e5ff',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#00e5ff',
+                        fill: false,
+                        order: 1, // Render line on top of bars
+                        datalabels: {
+                            display: false // Hide data labels on the line to keep it clean
+                        }
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Quarterly Growth (%)',
+                        data: allValues,
+                        backgroundColor: function(context) {
+                            const index = context.dataIndex;
+                            const value = context.dataset.data[index];
+                            return value < 0 ? 'rgba(217, 83, 79, 0.85)' : 'rgba(28, 115, 204, 0.85)';
+                        },
+                        borderWidth: 0,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.9,
+                        order: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { 
+                            color: '#888', 
+                            maxTicksLimit: 20,
+                            callback: function(val, index) {
+                                const labelStr = this.getLabelForValue(val);
+                                if (labelStr && labelStr.endsWith('-Q1')) {
+                                    return labelStr.split('-')[0];
+                                }
+                                return '';
+                            }
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' }
+                    },
+                    y: {
+                        ticks: { 
+                            color: '#888',
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.08)' }
+                    }
+                },
+                plugins: {
+                    legend: { 
+                        display: true,
+                        labels: {
+                            color: '#ccc',
+                            boxWidth: 12,
+                            font: { size: 11 }
+                        }
+                    },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'end',
+                        color: '#e0e0e0',
+                        font: {
+                            size: 10,
+                            family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+                        },
+                        formatter: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return 'Period: ' + context[0].label;
+                            },
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.raw + '%';
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+
+        function updateTimeframe(count, btnElement) {
+            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            const targetLabels = count === 'full' ? allLabels : allLabels.slice(-count);
+            const targetValues = count === 'full' ? allValues : allValues.slice(-count);
+
+            // Update both line and bar datasets
+            eurostatChart.data.labels = targetLabels;
+            eurostatChart.data.datasets[0].data = targetValues;
+            eurostatChart.data.datasets[1].data = targetValues;
+            
+            eurostatChart.update();
+        }
+    </script>
+</body>
+</html>
